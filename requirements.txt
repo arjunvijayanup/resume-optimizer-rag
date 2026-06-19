@@ -1,0 +1,7 @@
+llama-index
+llama-index-core
+llama-index-embeddings-gemini
+llama-index-llms-gemini
+pypdf2
+python-dotenv
+streamlit
