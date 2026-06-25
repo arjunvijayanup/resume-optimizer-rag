@@ -86,7 +86,17 @@ def run_rag(documents, query_text:str, job_title: str, job_description: str,
 
 def display_pdf(pdf_file):
     """Display PDF in the sidebar"""
-    pass
+    try:
+        st.sidebar.subheader("Resume Preview")
+        base64_pdf = base64.b64encode(pdf_file.getvalue().decode('utf-8'))
+        pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" type="application/pdf"></iframe>'
+        st.sidebar.markdown(pdf_display, unsafe_allow_html = True)
+
+        return True
+
+    except Exception as e:
+        st.sidebar.error(f"Error previewing PDF: {str(e)}")
+        return False
 
 def main():
     pass
