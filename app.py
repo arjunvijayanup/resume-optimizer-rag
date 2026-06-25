@@ -1,30 +1,28 @@
 import streamlit as st
 import os
-from llama_index_core import SimpleDirectoryReader, Settings, VectorStoreIndex
-from llama_index.embeddings.gemini import GeminiEmbedding
-from llama_index.llms.gemini import Gemini
+from llama_index.core import SimpleDirectoryReader, Settings, VectorStoreIndex
+from llama_index.embeddings.huggingface_api import HuggingFaceInferenceAPIEmbedding
+from llama_index.llms.groq import Groq
 from dotenv import load_dotenv
 import tempfile
 import shutil
 import base64
-from pypdf2 import PdfReader
 import io
 
 load_dotenv()
 
 def run_rag(documents, query_text:str, job_title: str, job_description: str, 
-            embedding_model: str = "models/gemini-embedding-001",
-            generative_model: str = "models/gemini-1.5-flash"
+            embedding_model: str = "BAAI/bge-base-en-v1.5",
+            generative_model: str = "llama-3.1-8b-instant"
             ) -> str:
     """Running RAG using Gemini models for resume optimization"""
     try:
-        llm = Gemini(
+        llm = Groq(
             model = generative_model,
-            api_key = os.getenv("GEMINI_API_KEY")
+            api_key = os.getenv("GROQ_API_KEY")
             )
-        embed_model = GeminiEmbedding(
-            model_name = embedding_model,
-            api_key = os.getenv("GEMINI_API_KEY")
+        embed_model = HuggingFaceInferenceAPIEmbedding(
+            model_name = embedding_model
             )
         Settings.llm = llm
         Settings.embed_model = embed_model
@@ -88,7 +86,7 @@ def display_pdf(pdf_file):
     """Display PDF in the sidebar"""
     try:
         st.sidebar.subheader("Resume Preview")
-        base64_pdf = base64.b64encode(pdf_file.getvalue().decode('utf-8'))
+        base64_pdf = base64.b64encode(pdf_file.getvalue()).decode('utf-8')
         pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="500" type="application/pdf"></iframe>'
         st.sidebar.markdown(pdf_display, unsafe_allow_html = True)
 
@@ -112,8 +110,8 @@ def main():
         st.session_state.current_pdf = None
 
     # Header
-    st.title("Resume Otimizer")
-    st.caption("Powered by Gemini")
+    st.title("Resume Optimizer")
+    st.caption("Powered by Groq + HuggingFace")
 
     # Sidebar for configuration
     with st.sidebar:
@@ -121,12 +119,22 @@ def main():
         # Model selection
         generative_model = st.selectbox(
             "Generative Model",
-            ["gemini-1.5-flash"]
+            [
+                "llama-3.1-8b-instant",
+                "llama-3.3-70b-versatile",
+                "qwen-qwq-32b"
+            
+            ]
         )
 
         embedding_model = st.selectbox(
             "Embedding Model",
-            ["gemini-embedding-001"]
+            [  
+                "BAAI/bge-small-en-v1.5",
+                "BAAI/bge-base-en-v1.5",
+                "BAAI/bge-m3"
+            
+            ]
         )
 
         st.divider()
@@ -144,7 +152,7 @@ def main():
             if uploaded_file != st.session_state.current_pdf: # If uploaded pdf is same as already present pdf in session state
                 st.session_state.current_pdf = uploaded_file
                 try:
-                    if not os.getenv("GEMINI_API_KEY"):
+                    if not os.getenv("GROQ_API_KEY"):
                         st.error("Missing API Key")
                         st.stop()
 
@@ -219,7 +227,7 @@ def main():
                     )
                     # Remvoing thinking tags from the responses
                     #response = response.replace("<think>", "").replace("</think>", "")
-                    st.session_state.messages.append({"role": "assistant", "content": response})
+                    st.session_state.messages = [{"role": "assistant", "content": response}]
                 except Exception as e:
                     st.error(f"Error: {str(e)}")
             
@@ -228,7 +236,7 @@ def main():
     with col2:
         st.subheader("Optimization Results")
         for message in st.session_state.messages:
-            st.markdown(message["content"])
+            st.markdown(message["content"]) # 
 
 if __name__ == "__main__":
     main()

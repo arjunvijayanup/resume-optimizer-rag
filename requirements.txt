@@ -1,7 +1,6 @@
 llama-index
 llama-index-core
-llama-index-embeddings-gemini
-llama-index-llms-gemini
-pypdf2
+llama-index-embeddings-huggingface-api
+llama-index-llms-groq
 python-dotenv
 streamlit
