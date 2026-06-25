@@ -99,4 +99,136 @@ def display_pdf(pdf_file):
         return False
 
 def main():
-    pass
+    st.set_page_config(page_title = "Resume Optimizer", layout = "wide")
+
+    # Initializing session states
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+    if "docs_loaded" not in st.session_state:
+        st.session_state.docs_loaded = False
+    if "temp_dir" not in st.session_state:
+        st.session_state.temp_dir = None
+    if "current_pdf" not in st.session_state:
+        st.session_state.current_pdf = None
+
+    # Header
+    st.title("Resume Otimizer")
+    st.caption("Powered by Gemini")
+
+    # Sidebar for configuration
+    with st.sidebar:
+        
+        # Model selection
+        generative_model = st.selectbox(
+            "Generative Model",
+            ["gemini-1.5-flash"]
+        )
+
+        embedding_model = st.selectbox(
+            "Embedding Model",
+            ["gemini-embedding-001"]
+        )
+
+        st.divider()
+
+        # Resume upload button
+        st.subheader("Upload Resume")
+        uploaded_file = st.file_uploader(
+            "Choose you resume (PDF)",
+            type = "pdf",
+            accept_multiple_files = False
+        )
+
+        # PDF upload and processing handler
+        if uploaded_file is not None:
+            if uploaded_file != st.session_state.current_pdf: # If uploaded pdf is same as already present pdf in session state
+                st.session_state.current_pdf = uploaded_file
+                try:
+                    if not os.getenv("GEMINI_API_KEY"):
+                        st.error("Missing API Key")
+                        st.stop()
+
+                    # Creating temp directory for the pdf
+                    if st.session_state.temp_dir:
+                        shutil.rmtree(st.session_state.temp_dir) # Removing dir if already temp dir present
+                    st.session_state.temp_dir = tempfile.mkdtemp() # Create temp dir
+
+                    # Saving uploaded PDF to temp directory
+                    file_path = os.path.join(st.session_state.temp_dir, uploaded_file.name)
+                    with open(file_path, "wb") as f: # Opening in write, binary mode
+                        f.write(uploaded_file.getbuffer()) # extracting raw bytes from uploaded pdf and written to the disk
+                    
+                    with st.spinner("Loading Resume..."):
+                        documents = SimpleDirectoryReader(st.session_state.temp_dir).load_data() # Reading everything in the temp folder
+                        st.session_state.docs_loaded = True
+                        st.session_state.documents = documents
+                        st.success("Resume Loaded Successfully")
+                        display_pdf(uploaded_file)
+                
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+    
+    col1, col2 = st.columns([1, 1])
+
+    with col1:
+        st.subheader("Job Information")
+        job_title = st.text_input("Job Title")
+        job_description = st.text_area("Job Description", height = 200)
+
+        st.subheader("Optimization Options")
+        optimization_type = st.selectbox("Select Optimization Type",
+                                         [
+                                             "ATS Keyword Optimizer",
+                                             "Experience Section Enhancer",
+                                             "Skills Hierarchy Creator",
+                                             "Professional Summary Crafter",
+                                             "Education Optimizer",
+                                             "Technical Skills Showcase",
+                                             "Career Gap Framing"
+                                         ])
+        
+        if st.button("Optimize Resume"):
+
+            if not st.session_state.docs_loaded:
+                st.error("Please upload your resume first")
+                st.stop()
+            if not job_title or not job_description:
+                st.error("Please provide both Job title and Job description")
+                st.stop()
+            
+            # Optimization prompts based on user optimization type selections
+            prompts = {
+                "ATS Keyword Optimizer": "Identify and optimize ATS keywords. Focus on exact matches and semantic variations from the job description.",
+                "Experience Section Enhancer": "Enhance experience section to align with job requirements. Focus on quantifiable achievements.",
+                "Skills Hierarchy Creator": "Organize skills based on job requirements. Identify gaps and development opportunities.",
+                "Professional Summary Crafter": "Create a targeted professional summary highlighting relevant experience and skills.",
+                "Education Optimizer": "Optimize education section to emphasize relevant qualifications for this position.",
+                "Technical Skills Showcase": "Organize technical skills based on job requirements. Highlight key competencies.",
+                "Career Gap Framing": "Address career gaps professionally. Focus on growth and relevant experience."
+            }
+
+            with st.spinner("Analyzing resume and generating suggestions..."):
+                try:
+                    response = run_rag(
+                        st.session_state.documents,
+                        prompts[optimization_type],
+                        job_title,
+                        job_description,
+                        embedding_model,
+                        generative_model
+                    )
+                    # Remvoing thinking tags from the responses
+                    #response = response.replace("<think>", "").replace("</think>", "")
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+                except Exception as e:
+                    st.error(f"Error: {str(e)}")
+            
+            st.divider()
+    
+    with col2:
+        st.subheader("Optimization Results")
+        for message in st.session_state.messages:
+            st.markdown(message["content"])
+
+if __name__ == "__main__":
+    main()
